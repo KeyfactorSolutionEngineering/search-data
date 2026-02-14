@@ -1,79 +1,51 @@
-name: Random Key & Secret Generator Demo
-
-on:
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-jobs:
-  generate:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      # 1️⃣ Generate RSA Key
-      - name: Generate RSA 2048 Key
+      # 🔸 Create dummy tokens/secrets for scanner testing (NOT REAL CREDENTIALS)
+      - name: Create dummy secrets (for scanning demo only)
         run: |
-          mkdir -p output
-          openssl genpkey -algorithm RSA -out output/rsa_private.pem -pkeyopt rsa_keygen_bits:2048
-          openssl rsa -pubout -in output/rsa_private.pem -out output/rsa_public.pem
-          echo "RSA key generated"
+          mkdir -p output/dummy
+          echo "AKIAFAKEACCESSKEY123456" > output/dummy/aws_access_key_id.txt
+          echo "wJalrXUtnFEMI/K7MDENG/bPxRfiCYFAKEKEY" > output/dummy/aws_secret_access_key.txt
+          echo "ghp_FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE" > output/dummy/github_pat.txt
+          echo "-----BEGIN PRIVATE KEY-----" > output/dummy/fake_private_key.pem
+          echo "MIIBVgIBADANBgkqhkiG9w0BAQEFAASCAT8wggE7AgEAAkEA..." >> output/dummy/fake_private_key.pem
+          echo "-----END PRIVATE KEY-----" >> output/dummy/fake_private_key.pem
+          echo "Dummy secrets created for scanner testing (not committed)."
 
-      # 2️⃣ Generate EC Key
-      - name: Generate EC P-256 Key
+      # 🔐 Generate REAL cryptographic keys (safe for demo, not cloud credentials)
+      - name: Generate real RSA 4096 keypair
         run: |
-          openssl ecparam -name prime256v1 -genkey -noout -out output/ec_private.pem
-          openssl ec -in output/ec_private.pem -pubout -out output/ec_public.pem
-          echo "EC key generated"
+          mkdir -p output/real
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out output/real/rsa_4096_private.pem
+          openssl rsa -pubout -in output/real/rsa_4096_private.pem -out output/real/rsa_4096_public.pem
+          echo "Real RSA 4096 keypair generated."
 
-      # 3️⃣ Generate Random Symmetric Key (256-bit)
-      - name: Generate Symmetric AES Key
+      - name: Generate real EC keypair (P-384)
         run: |
-          openssl rand -hex 32 > output/aes_key.hex
-          echo "AES key generated"
+          openssl ecparam -name secp384r1 -genkey -noout -out output/real/ec_p384_private.pem
+          openssl ec -in output/real/ec_p384_private.pem -pubout -out output/real/ec_p384_public.pem
+          echo "Real EC P-384 keypair generated."
 
-      # 4️⃣ Generate Random API Key
-      - name: Generate API Key
+      - name: Generate real HMAC secret (512-bit)
         run: |
-          API_KEY=$(openssl rand -base64 32 | tr -d '\n')
-          echo "::add-mask::$API_KEY"
-          echo "$API_KEY" > output/api_key.txt
-          echo "API key generated (masked)"
+          openssl rand -hex 64 > output/real/hmac_secret_512.hex
+          echo "Real HMAC secret generated."
 
-      # 5️⃣ Generate Random Password
-      - name: Generate Random Password
+      - name: Generate real JWT signing secret (Base64 512-bit)
         run: |
-          PASSWORD=$(openssl rand -base64 18 | tr -d '\n')
-          echo "::add-mask::$PASSWORD"
-          echo "$PASSWORD" > output/password.txt
-          echo "Password generated (masked)"
+          openssl rand -base64 64 | tr -d '\n' > output/real/jwt_secret.txt
+          echo "Real JWT secret generated."
 
-      # 6️⃣ Generate HMAC Secret
-      - name: Generate HMAC Secret
+      - name: Generate real symmetric AES key (256-bit)
         run: |
-          openssl rand -hex 64 > output/hmac_secret.hex
-          echo "HMAC secret generated"
+          openssl rand -hex 32 > output/real/aes_256_key.hex
+          echo "Real AES-256 key generated."
 
-      # 7️⃣ Generate JWT Secret
-      - name: Generate JWT Signing Secret
+      - name: Mask real secrets in logs
         run: |
-          JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n')
+          JWT_SECRET=$(cat output/real/jwt_secret.txt)
           echo "::add-mask::$JWT_SECRET"
-          echo "$JWT_SECRET" > output/jwt_secret.txt
-          echo "JWT secret generated (masked)"
+          echo "Secrets masked in workflow logs."
 
-      # 8️⃣ Demonstrate Using a Secret Securely
-      - name: Example usage (masked output)
-        run: |
-          SECRET=$(cat output/api_key.txt)
-          echo "::add-mask::$SECRET"
-          echo "Using API key safely without printing it."
-
-      # 9️⃣ Upload All Generated Keys
-      - name: Upload Generated Keys & Secrets
+      - name: Upload generated crypto material
         uses: actions/upload-artifact@v4
         with:
           name: generated-crypto-material
