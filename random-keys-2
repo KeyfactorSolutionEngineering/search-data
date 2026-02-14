@@ -39,6 +39,23 @@
           openssl rand -hex 32 > output/real/aes_256_key.hex
           echo "Real AES-256 key generated."
 
+      # 🔐 Generate REAL PEM encoded certificate + private key
+      - name: Generate real PEM certificate (self-signed)
+        run: |
+          mkdir -p output/real/cert
+
+          # Generate private key
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out output/real/cert/demo_cert_key.pem
+
+          # Generate self-signed certificate
+          openssl req -new -x509 \
+            -key output/real/cert/demo_cert_key.pem \
+            -out output/real/cert/demo_cert.pem \
+            -days 365 \
+            -subj "/C=US/ST=Test/L=Test/O=SolutionEngineering/OU=AgileSecScan/CN=example.local"
+
+          echo "Generated real PEM certificate and private key."
+
       - name: Mask real secrets in logs
         run: |
           JWT_SECRET=$(cat output/real/jwt_secret.txt)
