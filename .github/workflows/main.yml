@@ -1,0 +1,63 @@
+name: Random Key & Secret Generator Demo
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # 🔸 Create dummy tokens/secrets for scanner testing (NOT REAL CREDENTIALS)
+      - name: Create dummy secrets (for scanning demo only)
+        run: |
+          mkdir -p output/dummy
+          echo "AKIAFAKEACCESSKEY123456" > output/dummy/aws_access_key_id.txt
+          echo "wJalrXUtnFEMI/K7MDENG/bPxRfiCYFAKEKEY" > output/dummy/aws_secret_access_key.txt
+          echo "ghp_FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE" > output/dummy/github_pat.txt
+          cat > output/dummy/fake_private_key.pem <<'EOF'
+          -----BEGIN PRIVATE KEY-----
+          MIIBVgIBADANBgkqhkiG9w0BAQEFAASCAT8wggE7AgEAAkEA...
+          -----END PRIVATE KEY-----
+          EOF
+          echo "Dummy secrets created for scanner testing (not committed)."
+
+      # 🔐 Generate REAL cryptographic keys (safe demo material; do not commit)
+      - name: Generate RSA 4096 keypair
+        run: |
+          mkdir -p output/real
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out output/real/rsa_4096_private.pem
+          openssl rsa -pubout -in output/real/rsa_4096_private.pem -out output/real/rsa_4096_public.pem
+          echo "Real RSA 4096 keypair generated."
+
+      - name: Generate EC keypair (P-384)
+        run: |
+          openssl ecparam -name secp384r1 -genkey -noout -out output/real/ec_p384_private.pem
+          openssl ec -in output/real/ec_p384_private.pem -pubout -out output/real/ec_p384_public.pem
+          echo "Real EC P-384 keypair generated."
+
+      - name: Generate symmetric + HMAC + JWT secrets
+        run: |
+          openssl rand -hex 32 > output/real/aes_256_key.hex
+          openssl rand -hex 64 > output/real/hmac_secret_512.hex
+          openssl rand -base64 64 | tr -d '\n' > output/real/jwt_secret.txt
+          echo "Real symmetric/HMAC/JWT secrets generated."
+
+      - name: Mask JWT secret in logs (example)
+        run: |
+          JWT_SECRET=$(cat output/real/jwt_secret.txt)
+          echo "::add-mask::$JWT_SECRET"
+          echo "Masked JWT secret."
+
+      # 📦 Upload artifacts for download
+      - name: Upload generated material
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-crypto-material
+          path: output/
